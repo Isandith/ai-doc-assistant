@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from google.genai import types, errors
 
 from app.core.gemini_client import client
 from app.core.config import DEFAULT_MODEL
+from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/ask", tags=["ask"])
 
@@ -12,7 +13,7 @@ class AskRequest(BaseModel):
     input: str
 
 @router.post("")
-def ask(request: AskRequest):
+def ask(request: AskRequest, current_user: dict = Depends(get_current_user)):
     try:
         resp = client.models.generate_content(
             model=DEFAULT_MODEL,
@@ -25,7 +26,12 @@ def ask(request: AskRequest):
                 ),
             ),
         )
-        return {"model": DEFAULT_MODEL, "answer": resp.text}
+        return {
+            "model": DEFAULT_MODEL,
+            "answer": resp.text,
+            "user_uid": current_user["uid"],
+            "user_email": current_user["email"]
+        }
 
     except errors.ClientError as e:
         status_code = getattr(e, "code", 500) or 500
